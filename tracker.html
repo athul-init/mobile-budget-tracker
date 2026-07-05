@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTrack Mobile with Charts</title>
+    <!-- Include lightweight Chart.js Library via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #f6f8fa;
+            color: #1f2328;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 425px;
+            background-color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            position: relative;
+        }
+
+        header {
+            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            color: #ffffff;
+            padding: 25px 20px;
+            border-bottom-left-radius: 24px;
+            border-bottom-right-radius: 24px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .balance-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .balance-label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+
+        .balance-amount {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 5px 0;
+        }
+
+        .main-content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* Chart Canvas Container Wrapper */
+        .chart-section {
+            background: #ffffff;
+            border: 1px solid #eaeef2;
+            padding: 15px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            max-height: 260px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #57606a;
+            margin-bottom: 6px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+            background-color: #f6f8fa;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: #4f46e5;
+            background-color: #ffffff;
+        }
+
+        .btn {
+            background-color: #4f46e5;
+            color: #ffffff;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 5px;
+        }
+
+        .btn:active {
+            background-color: #3730a3;
+        }
+
+        .history-section {
+            margin-top: 25px;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .history-section h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .clear-btn {
+            background: none;
+            border: none;
+            color: #cf222e;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tx-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px;
+            background-color: #f6f8fa;
+            border-radius: 12px;
+            border-left: 5px solid #d0d7de;
+            animation: slideIn 0.2s ease-out;
+        }
+
+        .tx-item.income { border-left-color: #1a7f37; }
+        .tx-item.expense { border-left-color: #cf222e; }
+
+        .tx-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .tx-title { font-weight: 600; font-size: 0.95rem; }
+        
+        .tx-category {
+            font-size: 0.75rem;
+            color: #57606a;
+            background-color: #eaeef2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            width: fit-content;
+        }
+
+        .tx-value { font-weight: 700; font-size: 1rem; }
+        .value-income { color: #1a7f37; }
+        .value-expense { color: #cf222e; }
+
+        @keyframes slideIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <header>
+            <h1>FinTrack</h1>
+            <div class="balance-card">
+                <div class="balance-label">Current Balance</div>
+                <div class="balance-amount">₹<span id="total-balance">0.00</span></div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Expense Breakdown Diagram Module -->
+            <div class="chart-section">
+                <canvas id="expenseChart"></canvas>
+            </div>
+
+            <form id="tx-form">
+                <div class="form-group">
+                    <label for="tx-text">Description</label>
+                    <input type="text" id="tx-text" placeholder="e.g., Groceries, Salary, Coffee" required />
+                </div>
+                
+                <div class="form-group">
+                    <label for="tx-type">Transaction Type</label>
+                    <select id="tx-type">
+                        <option value="expense">Expense (-)</option>
+                        <option value="income">Income (+)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tx-category">Category</label>
+                    <select id="tx-category">
+                        <option value="Food">🍔 Food & Dining</option>
+                        <option value="Salary">💼 Income / Salary</option>
+                        <option value="Transport">🚗 Transport</option>
+                        <option value="Entertainment">🎬 Entertainment</option>
+                        <option value="Utilities">💡 Utilities / Bills</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tx-amount">Amount (₹)</label>
+                    <input type="number" id="tx-amount" step="0.01" placeholder="0.00" required />
+                </div>
+
+                <button type="submit" class="btn">Add Transaction</button>
+            </form>
+
+            <div class="history-section">
+                <div class="history-header">
+                    <h3>Recent Ledger</h3>
+                    <button id="clear-all" class="clear-btn">Clear All</button>
+                </div>
+                <div class="transaction-list" id="tx-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('fintrack_txs')) || [];
+        let expenseChartInstance = null; // Holds the mutable Chart instance reference
+
+        const form = document.getElementById('tx-form');
+        const textInput = document.getElementById('tx-text');
+        const typeInput = document.getElementById('tx-type');
+        const catInput = document.getElementById('tx-category');
+        const amountInput = document.getElementById('tx-amount');
+        const balanceDisplay = document.getElementById('total-balance');
+        const listDisplay = document.getElementById('tx-list');
+        const clearBtn = document.getElementById('clear-all');
+
+        // Initializing the Chart view engine
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            expenseChartInstance = new Chart(ctx, {
+                type: 'doughnut', // Doughnut offers cleaner look for mobile views
+                data: {
+                    labels: ['Food', 'Transport', 'Entertainment', 'Utilities'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#ff6384', '#36a2eb', '#cc65fe', '#ffce56'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, font: { size: 11 } }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Expense Breakdown (₹)',
+                            font: { weight: 'bold', size: 12 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Analytical Engine processing state to derive values for the Chart data arrays
+        function updateChartData() {
+            if (!expenseChartInstance) return;
+
+            const categories = ['Food', 'Transport', 'Entertainment', 'Utilities'];
+            
+            // Loop and compile total sums matching categories specifically targeting type === 'expense'
+            const aggregatedExpenses = categories.map(cat => {
+                return transactions
+                    .filter(tx => tx.type === 'expense' && tx.category === cat)
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+            });
+
+            // Push values smoothly to data properties and perform soft view tree invalidate repaint
+            expenseChartInstance.data.datasets[0].data = aggregatedExpenses;
+            expenseChartInstance.update();
+        }
+
+        function recalculateMetrics() {
+            const finalBalance = transactions.reduce((acc, current) => {
+                return current.type === 'income' ? acc + current.amount : acc - current.amount;
+            }, 0);
+
+            balanceDisplay.textContent = finalBalance.toFixed(2);
+            localStorage.setItem('fintrack_txs', JSON.stringify(transactions));
+            
+            renderLedgerDOM();
+            updateChartData(); // Keep visual graph calculations synced with base states
+        }
+
+        function addTransaction(e) {
+            e.preventDefault();
+
+            const newTransaction = {
+                id: Date.now(),
+                text: textInput.value.trim(),
+                type: typeInput.value,
+                category: catInput.value,
+                amount: parseFloat(amountInput.value)
+            };
+
+            transactions.unshift(newTransaction);
+            
+            textInput.value = '';
+            amountInput.value = '';
+            textInput.focus();
+
+            recalculateMetrics();
+        }
+
+        function clearLedger() {
+            if (confirm("Are you sure you want to wipe out all tracking histories?")) {
+                transactions = [];
+                recalculateMetrics();
+            }
+        }
+
+        function renderLedgerDOM() {
+            listDisplay.innerHTML = '';
+
+            if (transactions.length === 0) {
+                listDisplay.innerHTML = '<div style="text-align:center; color:#57606a; font-size:0.9rem; padding:20px;">No entries registered yet.</div>';
+                return;
+            }
+
+            transactions.forEach(tx => {
+                const row = document.createElement('div');
+                row.className = `tx-item ${tx.type}`;
+                const sign = tx.type === 'income' ? '+' : '-';
+                const classValue = tx.type === 'income' ? 'value-income' : 'value-expense';
+
+                row.innerHTML = `
+                    <div class="tx-details">
+                        <span class="tx-title">${tx.text}</span>
+                        <span class="tx-category">${tx.category}</span>
+                    </div>
+                    <span class="tx-value ${classValue}">${sign}₹${tx.amount.toFixed(2)}</span>
+                `;
+                listDisplay.appendChild(row);
+            });
+        }
+
+        form.addEventListener('submit', addTransaction);
+        clearBtn.addEventListener('click', clearLedger);
+
+        // Bootstrap Sequence
+        initChart();
+        recalculateMetrics();
+    </script>
+</body>
+</html>
